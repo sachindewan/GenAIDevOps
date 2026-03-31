@@ -6,8 +6,16 @@ on:
   pull_request:
     branches: [ main ]
 
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
 permissions:
   contents: read
+
+env:
+  SOLUTION: src/GenAIDevOps.sln
+  BUILD_CONFIG: Release
 
 jobs:
   build-and-test:
@@ -24,10 +32,10 @@ jobs:
           cache-dependency-path: src/**/*.csproj
 
       - name: Restore dependencies
-        run: dotnet restore src/GenAIDevOps.sln
+        run: dotnet restore ${{ env.SOLUTION }}
 
       - name: Build
-        run: dotnet build src/GenAIDevOps.sln --no-restore --configuration Release
+        run: dotnet build ${{ env.SOLUTION }} --no-restore --configuration ${{ env.BUILD_CONFIG }}
 
       - name: Test
-        run: dotnet test src/GenAIDevOps.sln --no-build --configuration Release --verbosity normal
+        run: dotnet test ${{ env.SOLUTION }} --no-build --configuration ${{ env.BUILD_CONFIG }} --verbosity normal
