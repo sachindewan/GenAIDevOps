@@ -21,11 +21,7 @@ jobs:
         with:
           dotnet-version: '10.0.x'
           cache: true
-          cache-dependency-path:
-              src/**/*.csproj
-              src/**/*.fsproj
-              src/**/*.vbproj
-              src/GenAIDevOps.sln
+          cache-dependency-path: src/**/*.csproj
 
       - name: Restore dependencies
         run: dotnet restore
