@@ -38,4 +38,11 @@ jobs:
         run: dotnet build ${{ env.SOLUTION }} --no-restore --configuration ${{ env.BUILD_CONFIG }}
 
       - name: Test
-        run: dotnet test ${{ env.SOLUTION }} --no-build --configuration ${{ env.BUILD_CONFIG }} --verbosity normal
+        run: dotnet test ${{ env.SOLUTION }} --no-build --configuration ${{ env.BUILD_CONFIG }} --verbosity normal --logger trx --results-directory testresults
+
+      - name: Upload test results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: test-results
+          path: testresults/**/*.trx
