@@ -24,10 +24,10 @@ jobs:
           cache-dependency-path: src/**/*.csproj
 
       - name: Restore dependencies
-        run: dotnet restore
+        run: dotnet restore src/GenAIDevOps.sln
 
       - name: Build
-        run: dotnet build --no-restore --configuration Release
+        run: dotnet build src/GenAIDevOps.sln --no-restore --configuration Release
 
       - name: Test
-        run: dotnet test --no-build --configuration Release --verbosity normal
+        run: dotnet test src/GenAIDevOps.sln --no-build --configuration Release --verbosity normal
