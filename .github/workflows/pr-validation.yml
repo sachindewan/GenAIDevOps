@@ -99,25 +99,29 @@ jobs:
             TEST_NOTE="No test files changed - ensure new logic is covered."
           fi
 
-          gh pr comment "$PR_NUMBER" --body "## PR Summary
+          cat <<EOF > summary.md
+          ## PR Summary
 
-**Title:** $PR_TITLE
+          **Title:** $PR_TITLE
 
-### Changes
-$COMMITS
+          ### Changes
+          $COMMITS
 
-### Risk Assessment
-| Area | Status |
-|---|---|
-| Risk Level | $RISK |
-| Infra Impact | $INFRA_IMPACT |
+          ### Risk Assessment
+          | Area | Status |
+          |---|---|
+          | Risk Level | $RISK |
+          | Infra Impact | $INFRA_IMPACT |
 
-### Testing Considerations
-$TEST_NOTE
+          ### Testing Considerations
+          $TEST_NOTE
 
-### CI Results
-| Job | Result |
-|---|---|
-| Build & Test | $BUILD_RESULT |
-| Formatting | $FORMAT_RESULT |
-| Dependency Review | $DEP_RESULT |"
+          ### CI Results
+          | Job | Result |
+          |---|---|
+          | Build & Test | $BUILD_RESULT |
+          | Formatting | $FORMAT_RESULT |
+          | Dependency Review | $DEP_RESULT |
+          EOF
+
+          gh pr comment "$PR_NUMBER" --body-file summary.md
