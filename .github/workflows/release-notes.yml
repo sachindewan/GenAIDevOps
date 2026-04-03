@@ -72,13 +72,56 @@ jobs:
 
       - name: Generate release-notes.md
         run: |
-          printf '%s\n' \
-            'def section(h; l): if (.labels | index(l)) != null then "## " + h + "\n- " + .title + " (#" + (.pr_number | tostring) + ") - @" + .author + "\n" else empty end;' \
-            'section("Breaking Changes"; "release:major"), section("Features"; "release:minor"), section("Fixes"; "release:patch"), section("Infrastructure"; "area:infra"),' \
-            'if (.labels | map(select(. == "release:major" or . == "release:minor" or . == "release:patch" or . == "area:infra")) | length) == 0 then "## Other Changes\n- " + .title + " (#" + (.pr_number | tostring) + ") - @" + .author + "\n" else empty end' \
-            > generate.jq
+          cat > generate.jq << 'JQEOF'
+          def category:
+            if (.labels | index("release:major")) != null then "Breaking Changes"
+            elif (.labels | index("release:minor")) != null then "Features"
+            elif (.labels | index("release:patch")) != null then "Fixes"
+            elif (.labels | index("area:infra")) != null then "Infrastructure"
+            else "Other Changes"
+            end;
 
-          jq -r -f generate.jq release-report.json > release-notes.md
+          def pr_ref:
+            if .pr_number != null then " (#" + (.pr_number | tostring) + ")" else "" end;
+
+          def label_badges:
+            if (.labels | length) > 0
+            then "**Labels:** " + (.labels | map("`" + . + "`") | join(" "))
+            else "**Labels:** none"
+            end;
+
+          def body_section:
+            if (.body != null and .body != "" and .body != "null")
+            then "### Description\n" + .body
+            else empty
+            end;
+
+          "## " + category + "\n",
+          "| Field   | Value |\n|---------|-------|\n",
+          "| Title   | " + .title + pr_ref + " |\n",
+          "| Author  | @" + .author + " |\n",
+          (label_badges + "\n"),
+          body_section
+          JQEOF
+
+          # strip leading spaces from heredoc
+          sed -i 's/^          //' generate.jq
+
+          VERSION="release-${{ github.sha }}"
+          SHORT_SHA=$(echo "${{ github.sha }}" | cut -c1-7)
+
+          {
+            echo "# Release ${SHORT_SHA}"
+            echo ""
+            echo "**Commit:** \`${{ github.sha }}\`"
+            echo "**Branch:** \`main\`"
+            echo "**Triggered by:** \`${{ github.actor }}\`"
+            echo ""
+            echo "---"
+            echo ""
+            jq -r -f generate.jq release-report.json
+          } > release-notes.md
+
           cat release-notes.md
 
           if [ ! -s release-notes.md ]; then
