@@ -5,7 +5,7 @@ on:
     branches: [ main ]
 
 permissions:
-  contents: read
+  contents: write
   pull-requests: read
 
 jobs:
@@ -51,18 +51,6 @@ jobs:
           name: release-report
           path: release-report.json
 
-      - name: Validate release report
-        run: |
-          if [ ! -s release-report.json ]; then
-            echo "Error: release-report.json is empty or missing"
-            exit 1
-          fi
-
-      - name: Create release
-        uses: softprops/action-gh-release@v1
-        with:
-          body_path: release-notes.md
-          draft: true
 
   generate-release-notes:
     runs-on: ubuntu-latest
@@ -95,3 +83,9 @@ jobs:
         with:
           name: release-notes
           path: release-notes.md
+
+      - name: Create release
+        uses: softprops/action-gh-release@v1
+        with:
+          body_path: release-notes.md
+          draft: true
