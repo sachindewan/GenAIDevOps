@@ -1,0 +1,97 @@
+name: Release Report
+
+on:
+  push:
+    branches: [ main ]
+
+permissions:
+  contents: read
+  pull-requests: read
+
+jobs:
+  collect-pr-metadata:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Find merged PR for commit
+        id: pr
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          PR=$(gh pr list \
+            --state merged \
+            --search "${{ github.sha }}" \
+            --json number,title,author,labels,body \
+            --limit 1 \
+            --repo ${{ github.repository }})
+
+          echo "data=$PR" >> $GITHUB_OUTPUT
+
+      - name: Build release-report.json
+        run: |
+          echo '${{ steps.pr.outputs.data }}' | jq '
+            if length == 0 then error("No merged PR found for this commit")
+            else .[0] | {
+              pr_number:  .number,
+              title:      .title,
+              author:     .author.login,
+              labels:     [.labels[].name],
+              body:       .body
+            }
+            end
+          ' > release-report.json
+
+          cat release-report.json
+
+      - name: Upload release report
+        uses: actions/upload-artifact@v4
+        with:
+          name: release-report
+          path: release-report.json
+
+      - name: Validate release report
+        run: |
+          if [ ! -s release-report.json ]; then
+            echo "Error: release-report.json is empty or missing"
+            exit 1
+          fi
+
+      - name: Create release
+        uses: softprops/action-gh-release@v1
+        with:
+          body_path: release-notes.md
+          draft: true
+
+  generate-release-notes:
+    runs-on: ubuntu-latest
+    needs: collect-pr-metadata
+    steps:
+      - name: Download release report
+        uses: actions/download-artifact@v4
+        with:
+          name: release-report
+
+      - name: Generate release-notes.md
+        run: |
+          jq -r '
+            def section(heading; label):
+              if (.labels | index(label)) != null then
+                "## " + heading + "\n- " + .title + " (#" + (.pr_number | tostring) + ") — @" + .author + "\n"
+              else empty
+              end;
+
+            section("Breaking Changes"; "release:major"),
+            section("Features";         "release:minor"),
+            section("Fixes";            "release:patch"),
+            section("Infrastructure";   "area:infra")
+          ' release-report.json > release-notes.md
+
+          cat release-notes.md
+
+      - name: Upload release notes
+        uses: actions/upload-artifact@v4
+        with:
+          name: release-notes
+          path: release-notes.md
