@@ -72,22 +72,24 @@ jobs:
 
       - name: Generate release-notes.md
         run: |
-          jq -r '
-            def section(heading; label):
-              if (.labels | index(label)) != null then
-                "## " + heading + "\n- " + .title + " (#" + (.pr_number | tostring) + ") \u2014 @" + .author + "\n"
-              else empty
-              end;
-
-            section("Breaking Changes"; "release:major"),
-            section("Features";         "release:minor"),
-            section("Fixes";            "release:patch"),
-            section("Infrastructure";   "area:infra"),
-            if (.labels | map(select(. == "release:major" or . == "release:minor" or . == "release:patch" or . == "area:infra")) | length) == 0 then
-              "## Other Changes\n- " + .title + " (#" + (.pr_number | tostring) + ") \u2014 @" + .author + "\n"
+          cat > generate.jq << 'EOF'
+          def section(heading; label):
+            if (.labels | index(label)) != null then
+              "## " + heading + "\n- " + .title + " (#" + (.pr_number | tostring) + ") \u2014 @" + .author + "\n"
             else empty
-            end
-          ' release-report.json > release-notes.md
+            end;
+
+          section("Breaking Changes"; "release:major"),
+          section("Features";         "release:minor"),
+          section("Fixes";            "release:patch"),
+          section("Infrastructure";   "area:infra"),
+          if (.labels | map(select(. == "release:major" or . == "release:minor" or . == "release:patch" or . == "area:infra")) | length) == 0 then
+            "## Other Changes\n- " + .title + " (#" + (.pr_number | tostring) + ") \u2014 @" + .author + "\n"
+          else empty
+          end
+          EOF
+
+          jq -r -f generate.jq release-report.json > release-notes.md
 
           echo "--- release-notes.md content ---"
           cat release-notes.md
