@@ -65,17 +65,28 @@ jobs:
           jq -r '
             def section(heading; label):
               if (.labels | index(label)) != null then
-                "## " + heading + "\n- " + .title + " (#" + (.pr_number | tostring) + ") — @" + .author + "\n"
+                "## " + heading + "\n- " + .title + " (#" + (.pr_number | tostring) + ") \u2014 @" + .author + "\n"
               else empty
               end;
 
             section("Breaking Changes"; "release:major"),
             section("Features";         "release:minor"),
             section("Fixes";            "release:patch"),
-            section("Infrastructure";   "area:infra")
+            section("Infrastructure";   "area:infra"),
+            if (.labels | map(select(. == "release:major" or . == "release:minor" or . == "release:patch" or . == "area:infra")) | length) == 0 then
+              "## Other Changes\n- " + .title + " (#" + (.pr_number | tostring) + ") \u2014 @" + .author + "\n"
+            else empty
+            end
           ' release-report.json > release-notes.md
 
+          echo "--- release-notes.md content ---"
           cat release-notes.md
+          echo "--- end ---"
+
+          if [ ! -s release-notes.md ]; then
+            echo "Error: release-notes.md is empty"
+            exit 1
+          fi
 
       - name: Upload release notes
         uses: actions/upload-artifact@v4
@@ -86,5 +97,6 @@ jobs:
       - name: Create release
         uses: softprops/action-gh-release@v1
         with:
+          tag_name: release-${{ github.sha }}
           body_path: release-notes.md
           draft: true
