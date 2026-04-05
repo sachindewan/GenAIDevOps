@@ -1,6 +1,3 @@
-using Microsoft.AspNetCore.Mvc;
-using SharedKernel;
-
 var builder = WebApplication.CreateBuilder(args);
 
 var app = builder.Build();
@@ -19,11 +16,19 @@ app.MapGet("/api/orders", () =>
     return Results.Ok(orders);
 });
 
+app.MapGet("/version", () =>
+{
+    var version = typeof(Program).Assembly.GetName().Version?.ToString() ?? "unknown";
+    return Results.Ok(version,
+        environment = app.Environment.EnvironmentName,
+        timestamp = DateTime.UtcNow);
+});
+
 app.Run();
 
 public sealed record HealthResponse(string Status);
 
 public static class HealthEndpoints
 {
-    public static HealthResponse GetHealthResponse() => new("ok");
+    public static HealthResponse GetHealthResponse() => new("badrequest");
 }
