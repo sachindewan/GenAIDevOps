@@ -93,7 +93,7 @@ jobs:
     needs: collect-metadata
     runs-on: ubuntu-latest
     environment:
-      name: devops-dev
+      name: GenAIDevops-Dev
     steps:
       - uses: actions/checkout@v4
 
