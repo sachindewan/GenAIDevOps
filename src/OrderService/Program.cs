@@ -1,4 +1,3 @@
-using Microsoft.AspNetCore.Mvc;
 using SharedKernel;
 
 var builder = WebApplication.CreateBuilder(args);
@@ -17,6 +16,17 @@ app.MapGet("/api/orders", () =>
     };
 
     return Results.Ok(orders);
+});
+
+app.MapGet("/version", () =>
+{
+    var version = typeof(Program).Assembly.GetName().Version?.ToString() ?? "unknown";
+    return Results.Ok(new
+    {
+        version,
+        environment = app.Environment.EnvironmentName,
+        timestamp = DateTime.UtcNow
+    });
 });
 
 app.Run();

@@ -121,7 +121,6 @@ jobs:
           |---|---|
           | Build & Test | $BUILD_RESULT |
           | Formatting | $FORMAT_RESULT |
-          | Dependency Review | $DEP_RESULT |
           EOF
 
           gh pr comment "$PR_NUMBER" --body-file summary.md
