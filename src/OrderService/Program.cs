@@ -1,3 +1,5 @@
+using SharedKernel;
+
 var builder = WebApplication.CreateBuilder(args);
 
 var app = builder.Build();
@@ -19,9 +21,12 @@ app.MapGet("/api/orders", () =>
 app.MapGet("/version", () =>
 {
     var version = typeof(Program).Assembly.GetName().Version?.ToString() ?? "unknown";
-    return Results.Ok(version,
+    return Results.Ok(new
+    {
+        version,
         environment = app.Environment.EnvironmentName,
-        timestamp = DateTime.UtcNow);
+        timestamp = DateTime.UtcNow
+    });
 });
 
 app.Run();
