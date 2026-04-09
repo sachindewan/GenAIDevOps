@@ -96,13 +96,6 @@ runs:
           exit 1
         fi
 
-        ENDPOINT="$(echo '${{ inputs.endpoint }}' | tr -d '[:space:]')"
-        if [[ ! "$ENDPOINT" =~ ^https://[a-zA-Z0-9._-]+\.openai\.azure\.com/?$ ]]; then
-          echo "Invalid endpoint format: '${ENDPOINT}'. Expected: https://<resource>.openai.azure.com"
-          exit 1
-        fi
-        ENDPOINT="${ENDPOINT%/}"
-
         BODY="$(jq -n \
           --arg system "$SYSTEM_PROMPT" \
           --arg user "$USER_INPUT" \

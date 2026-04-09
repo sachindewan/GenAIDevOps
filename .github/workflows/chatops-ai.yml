@@ -51,9 +51,9 @@ jobs:
         id: ai
         uses: ./.github/azure-openai-chat
         with:
-          endpoint: ${{ secrets.AZURE_OPENAI_API_URL }}
-          api_key: ${{ secrets.AZURE_OPENAI_KEY }}
-          deployment: ${{ secrets.MODEL }}
+          endpoint: ${{ secrets.AZURE_OPENAI_ENDPOINT }}
+          api_key: ${{ secrets.AZURE_OPENAI_API_KEY }}
+          deployment: ${{ secrets.AZURE_OPENAI_DEPLOYMENT }}
           system_prompt_file: "ai/prompts/chatops.prompt.md"
           user_input_file: "chatops-input.json"
           output_file: "chatops-output.md"

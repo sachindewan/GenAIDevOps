@@ -1,8 +1,9 @@
 name: Release Notes (AI)
 
 on:
-  push:
-    branches: [ main ]
+  # push:
+  #   branches: [ main ]
+  workflow_dispatch:
 
 permissions:
   contents: write
@@ -93,7 +94,7 @@ jobs:
     needs: collect-metadata
     runs-on: ubuntu-latest
     environment:
-      name: GenAIDevops-Dev
+      name: devops-dev
     steps:
       - uses: actions/checkout@v4
 
@@ -106,9 +107,9 @@ jobs:
         id: aoai
         uses: ./.github/azure-openai-chat
         with:
-          endpoint: ${{ secrets.AZURE_OPENAI_API_URL }}
-          api_key: ${{ secrets.AZURE_OPENAI_KEY }}
-          deployment: ${{ secrets.MODEL }}
+          endpoint: ${{ secrets.AZURE_OPENAI_ENDPOINT }}
+          api_key: ${{ secrets.AZURE_OPENAI_API_KEY }}
+          deployment: ${{ secrets.AZURE_OPENAI_DEPLOYMENT }}
           api_version: "2024-02-15-preview"
           system_prompt_file: "ai/prompts/release-notes.prompt.md"
           user_input_file: "release-report.json"
