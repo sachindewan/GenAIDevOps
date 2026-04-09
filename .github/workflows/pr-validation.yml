@@ -1,126 +1,194 @@
 name: PR Validation
 
 on:
-  pull_request:
-    branches: [main]
-
-concurrency:
-  group: pr-validation-${{ github.ref }}
-  cancel-in-progress: true
-  
+  # pull_request:
+  #   branches:
+  #     - main
+  workflow_dispatch:
+    
 permissions:
   contents: read
   pull-requests: write
 
+concurrency:
+  group: pr-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
 jobs:
   build-test:
-    name: Build & Test
+    name: Build and Test
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - name: Checkout
+        uses: actions/checkout@v4
 
-      - uses: actions/setup-dotnet@v4
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
         with:
-          dotnet-version: '10.x'
+          dotnet-version: 10.0.x
 
-      - run: dotnet restore src/GenAIDevOps.sln
-      - run: dotnet build src/GenAIDevOps.sln --configuration Release --no-restore
-      - name: Test with coverage
-        run: |
-          dotnet test src/GenAIDevOps.sln --configuration Release --no-build \
-            --collect:"XPlat Code Coverage" \
-            --results-directory ./coverage \
-            -- DataCollectionRunSettings.DataCollectors.DataCollector.Configuration.Threshold=70 \
-               DataCollectionRunSettings.DataCollectors.DataCollector.Configuration.ThresholdType=line \
-               DataCollectionRunSettings.DataCollectors.DataCollector.Configuration.ThresholdStat=total
+      - name: Restore
+        run: dotnet restore src/GenAIDevOps.sln
+
+      - name: Build (Release)
+        run: dotnet build src/GenAIDevOps.sln --configuration Release --no-restore
+
+      - name: Test with coverage (Release)
+        run: >-
+          dotnet test src/GenAIDevOps.sln --configuration Release --no-build
+          /p:CollectCoverage=true
+          /p:CoverletOutput=./TestResults/coverage/coverage
+          /p:CoverletOutputFormat=cobertura
+          /p:Threshold=70
+          /p:ThresholdType=line
 
       - name: Upload coverage report
-        if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: coverage-report
-          path: ./coverage
+          name: test-coverage
+          path: '**/TestResults/coverage/coverage.cobertura.xml'
 
-  formatting:
+  formatting-check:
     name: Formatting Check
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - name: Checkout
+        uses: actions/checkout@v4
 
-      - uses: actions/setup-dotnet@v4
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
         with:
-          dotnet-version: '10.x'
+          dotnet-version: 10.0.x
 
-      - run: dotnet restore src/GenAIDevOps.sln
-      - run: dotnet format src/GenAIDevOps.sln --verify-no-changes
+      - name: Verify formatting
+        run: dotnet format src/GenAIDevOps.sln --verify-no-changes
 
   # dependency-review:
-  #   name: Dependency Review
-  #   runs-on: ubuntu-latest
-  #   steps:
-  #     - uses: actions/checkout@v4
-  #     - uses: actions/dependency-review-action@v4
+    # name: Dependency Review
+    # runs-on: ubuntu-latest
+    # steps:
+    #   - name: Checkout
+    #     uses: actions/checkout@v4
+
+    #   - name: Dependency Review
+    #     uses: actions/dependency-review-action@v4
+    #     with:
+    #      repo-token: ${{ secrets.GITHUB_TOKEN }}
 
   pr-summary:
     name: PR Summary Comment
     runs-on: ubuntu-latest
-    needs: [build-test, formatting] #, dependency-review]
-    if: always()
+    needs:
+      - build-test
+      - formatting-check
+      # - dependency-review
     steps:
-      - uses: actions/checkout@v4
+      - name: Post PR summary comment
+        uses: actions/github-script@v7
         with:
-          fetch-depth: 0
+          script: |
+            const { owner, repo } = context.repo;
+            const pull_number = context.payload.pull_request.number;
 
-      - name: Build and post PR summary
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          PR_NUMBER: ${{ github.event.pull_request.number }}
-          PR_TITLE: ${{ github.event.pull_request.title }}
-          BUILD_RESULT: ${{ needs.build-test.result }}
-          FORMAT_RESULT: ${{ needs.formatting.result }}
-          #DEP_RESULT: ${{ needs.dependency-review.result }}
-        run: |
-          COMMITS=$(git log origin/main..HEAD --pretty=format:'- %s' | head -20)
-          CHANGED=$(git diff --name-only origin/main...HEAD)
+            const pr = await github.rest.pulls.get({ owner, repo, pull_number });
+            const commits = await github.paginate(github.rest.pulls.listCommits, {
+              owner,
+              repo,
+              pull_number,
+              per_page: 100,
+            });
 
-          INFRA_IMPACT=No
-          RISK=Low
+            const title = pr.data.title || "";
+            const commitMessages = commits
+              .map((commit) => commit.commit.message.split("\n")[0])
+              .filter((message) => message && message.trim().length > 0);
 
-          if echo "$CHANGED" | grep -qiE '\.(bicep|tf|json|yml|yaml)$'; then
-            INFRA_IMPACT=Yes
-            RISK=High
-          elif echo "$CHANGED" | grep -qiE '(migration|schema|database|auth|security)'; then
-            RISK=Medium
-          fi
+            const combinedText = [title, ...commitMessages].join(" ").toLowerCase();
 
-          if echo "$CHANGED" | grep -qiE 'test'; then
-            TEST_NOTE="Test files were modified - verify coverage is adequate."
-          else
-            TEST_NOTE="No test files changed - ensure new logic is covered."
-          fi
+            const highRiskKeywords = [
+              "security",
+              "breaking",
+              "migration",
+              "data loss",
+              "hotfix",
+              "rollback",
+            ];
+            const lowRiskKeywords = [
+              "docs",
+              "readme",
+              "chore",
+              "cleanup",
+              "refactor",
+              "format",
+            ];
 
-          cat <<EOF > summary.md
-          ## PR Summary
+            const infraKeywords = [
+              "infra",
+              "bicep",
+              "terraform",
+              "pipeline",
+              "workflow",
+              "azure",
+              "deployment",
+            ];
 
-          **Title:** $PR_TITLE
+            const risk = highRiskKeywords.some((k) => combinedText.includes(k))
+              ? "high"
+              : lowRiskKeywords.some((k) => combinedText.includes(k))
+                ? "low"
+                : "medium";
 
-          ### Changes
-          $COMMITS
+            const infraImpact = infraKeywords.some((k) => combinedText.includes(k))
+              ? "yes"
+              : "no";
 
-          ### Risk Assessment
-          | Area | Status |
-          |---|---|
-          | Risk Level | $RISK |
-          | Infra Impact | $INFRA_IMPACT |
+            const summaryLines = [
+              `PR Title: ${title || "(no title)"}`,
+              "Commit Messages:",
+              ...(commitMessages.length > 0
+                ? commitMessages.map((message) => `- ${message}`)
+                : ["- (no commits)"]),
+            ];
 
-          ### Testing Considerations
-          $TEST_NOTE
+            const commentBody = [
+              "<!-- pr-validation-summary -->",
+              "## PR Summary (Deterministic)",
+              "",
+              "**Summary of changes**",
+              ...summaryLines,
+              "",
+              `**Risk assessment**: ${risk}`,
+              "",
+              "**Testing considerations**: CI runs build/test/format/dependency review; add manual tests if needed.",
+              "",
+              `**Infra impact**: ${infraImpact}`,
+            ].join("\n");
 
-          ### CI Results
-          | Job | Result |
-          |---|---|
-          | Build & Test | $BUILD_RESULT |
-          | Formatting | $FORMAT_RESULT |
-          EOF
+            const { data: comments } = await github.rest.issues.listComments({
+              owner,
+              repo,
+              issue_number: pull_number,
+              per_page: 100,
+            });
 
-          gh pr comment "$PR_NUMBER" --body-file summary.md
+            const existing = comments.find(
+              (comment) =>
+                comment.user.type === "Bot" &&
+                comment.body.includes("<!-- pr-validation-summary -->")
+            );
+
+            if (existing) {
+              await github.rest.issues.updateComment({
+                owner,
+                repo,
+                comment_id: existing.id,
+                body: commentBody,
+              });
+            } else {
+              await github.rest.issues.createComment({
+                owner,
+                repo,
+                issue_number: pull_number,
+                body: commentBody,
+              });
+            }

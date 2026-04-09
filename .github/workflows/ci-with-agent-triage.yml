@@ -29,9 +29,9 @@ jobs:
         run: |
           dotnet run --file ai/agents/DevOpsFailureTriageAgent.cs -- ./artifacts/failure.log
         env:
-          AZURE_OPENAI_ENDPOINT: ${{ secrets.AZURE_OPENAI_API_URL }}
-          AZURE_OPENAI_API_KEY: ${{ secrets.AZURE_OPENAI_KEY }}
-          AZURE_OPENAI_DEPLOYMENT: ${{ secrets.MODEL }}
+          AZURE_OPENAI_ENDPOINT: ${{ secrets.AZURE_OPENAI_ENDPOINT }}
+          AZURE_OPENAI_API_KEY: ${{ secrets.AZURE_OPENAI_API_KEY }}
+          AZURE_OPENAI_DEPLOYMENT: ${{ secrets.AZURE_OPENAI_DEPLOYMENT }}
 
       - name: Upload triage artifacts
         if: ${{ always() }}
